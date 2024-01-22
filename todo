@@ -1,4 +1,5 @@
 add:
+save conversation to file by appending all new content.
 debuging mode
 CLI
 OBJECT storage (DATABASE)
