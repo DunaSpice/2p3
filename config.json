@@ -1,0 +1,5 @@
+{
+  "openai_model": "gpt-4",
+  "exit_command": "exit",
+  "system_message": "you are an expert on operating MacOs 13 os with zsh shell"
+}
