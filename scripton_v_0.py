@@ -38,11 +38,9 @@ tools = [
 
 # Define the execute_command function
 def execute_command(command):
-    # Split command input into command and arguments
-    command_parts = command.split()
     try:
         # Execute the command
-        result = subprocess.run(command_parts, shell=True, capture_output=True, text=True, check=True)
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
         output = result.stdout.strip()
         return {"success": True, "output": output or "done"}
     except Exception as e:
@@ -51,72 +49,71 @@ def execute_command(command):
 
 # Modify get_response to include tools and handle sending results back
 def get_response(client, messages):
-    try:
-        # Make a request to the OpenAI API, providing the model, messages, and tools,
-        # and return the response
-        return client.chat.completions.create(
-            model=config["openai_model"],
-            messages=messages,
-            tools=tools,
-            tool_choice="auto"
-        )
-    except Exception as e:
-        if config.get("debug", False):
-            return f"Debug Mode: An error occurred: {str(e)}"
-        else:
-            return "An error occurred. Please try again."
+    if config.get("debug", False):
+        print(f"Dbug: To AI messages = {messages}")
+    # Make a request to the OpenAI API, providing the model, messages and tools
+    return client.chat.completions.create(
+        model=config["openai_model"],
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        user=os.path.basename(__file__)
+    )
 
 
 # Define the function 'main' which is the entry point of the script
 def main():
     client = OpenAI(api_key=api_key)
     # To store the conversation history
-    conversation = [{"role": "system", "content": config["system_message"]},
-                    {"role": "system", "content": f"Your operation system is {os.name}"}]
+    conversation = [{"role": "system", "content": f"Your operation system is {os.name}" + config["system_message"]}]
 
     while True:
-        # Prompt user for input
+        # User for input
         user_content = input("Enter your request (or type '" + config["exit_command"] + "' to quit): ")
-
+        # Break out of the prompt loop to stop the program
         if user_content.lower() == config["exit_command"]:
-            # Break out of the prompt loop to stop the program
             break
 
         # Append user message to conversation history
         conversation.append({"role": "user", "content": user_content})
 
-        # Get response from OpenAI's ChatGPT
-        response = get_response(client, conversation)
+        try:
+            # Get response from OpenAI's ChatGPT
+            response = get_response(client, conversation)
+            if config.get("debug", False):
+                print(f"Debug: AI RawResponse = {response}")
 
-        # Print the content of the message if it's present
-        if response.choices[0].message.content:
-            print(response.choices[0].message.content)
-        else:
-            print("No response content.")
+            if response.choices[0].message.content:
+                print(response.choices[0].message.content)
+                conversation.append({"role": "assistant", "content": response.choices[0].message.content})
 
-        # Check if 'tool_calls' attribute exists and is not None
-        if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls is not None:
-            for tool_call in response.choices[0].message.tool_calls:
-                if getattr(tool_call, 'type', None) == 'function':
-                    function_name = getattr(tool_call.function, 'name', None)
-                    arguments = getattr(tool_call.function, 'arguments', "{}")
+            # Check if 'tool_calls' attribute exists and is not None
+            if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls is not None:
+                for tool_call in response.choices[0].message.tool_calls:
+                    if getattr(tool_call, 'type', None) == 'function':
+                        function_name = getattr(tool_call.function, 'name', None)
+                        arguments = getattr(tool_call.function, 'arguments', "{}")
 
-                    if function_name == 'execute_command':
-                        # Ensure that arguments are properly formatted as a string
-                        command = json.loads(arguments).get('command', '')
-                        if isinstance(command, str):
-                            # Execute the command and print the result
-                            result = execute_command(command)
-                            result_message = f"Command execution result: {result['output']}" if result['success'] else f"Error: {result['error']}"
-                            conversation.append({"role": "assistant", "content": result_message})
-                            print(result_message)
+                        if function_name == 'execute_command':
+                            # Ensure that arguments are properly formatted as a string
+                            command = json.loads(arguments).get('command', '')
+                            if isinstance(command, str):
+                                # Execute the command and print the result
+                                result = execute_command(command)
+                                result_message = f"Command execution result: {result['output']}" if result['success'] else f"Error: {result['error']}"
 
-                            # Optional: send the result back to the model for further conversation
-                            # response = get_response(client, conversation)
-                        else:
-                            print("Invalid command format.")
-                    else:
-                        print(f"No supported function called: {function_name}")
+                                # Send the tool result back to the model for further conversation
+                                conversation.append({"role": "assistant", "name": "tool", "content": result_message})
+
+                                # TODO conversation.append({"role": "tool", "content": result_message, "tool_call_id": tool_id})
+                                print(result_message)
+                            else:
+                                conversation.append(
+                                    {"role": "assistant", "name": "tool", "content": "Invalid command format."})
+                                print("Invalid command format.")
+
+        except Exception as e:
+            conversation.append({"role": "user", "name": "Exception", "content": e})
 
 
 # Check if the script is the main module being executed, and if so, call main()
