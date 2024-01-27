@@ -3,13 +3,10 @@ import os
 import subprocess
 from dotenv import load_dotenv
 from openai import OpenAI
-
 # Load .env file
 load_dotenv()
-
 # Load OpenAI API key from environment variable
 api_key = os.getenv("OPENAI_API_KEY")
-
 # Load configuration from JSON file
 with open("config.json", "r") as file:
     config = json.load(file)
@@ -57,7 +54,6 @@ def get_response(client, messages):
         messages=messages,
         tools=tools,
         tool_choice="auto",
-        user=os.path.basename(__file__)
     )
 
 
@@ -109,11 +105,11 @@ def main():
                                 print(result_message)
                             else:
                                 conversation.append(
-                                    {"role": "assistant", "name": "tool", "content": "Invalid command format."})
-                                print("Invalid command format.")
-
+                                    {"role": "assistant", "name": "tool", "content": f"Invalid command format.={command}"})
+                                print(f"Invalid command format.={command}")
         except Exception as e:
             conversation.append({"role": "user", "name": "Exception", "content": e})
+            print(f"Invalid command format.={e}")
 
 
 # Check if the script is the main module being executed, and if so, call main()
