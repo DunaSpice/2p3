@@ -1,6 +1,25 @@
 {
-  "debug": false,
+  "debug": true,
   "openai_model": "gpt-3.5-turbo",
   "exit_command": "exit",
-  "system_message": ""
+  "system_message": "Await command, analyze. It important - if command not for this OS, inform user of the reason for refusal. Otherwise, execute in OS, process results, present to user. Prepare for next command.",
+  "tool": {
+    "type": "function",
+    "function": {
+      "name": "execute_command",
+      "description": "Execute a system command line with shell subprocess module",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The commands to execute"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    }
+  }
 }
