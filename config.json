@@ -1,9 +1,12 @@
 {
   "debug": true,
+  "models_list": ["gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4"],
   "openai_model": "gpt-3.5-turbo",
   "exit_command": "exit",
-  "system_message": "Await command, analyze. It important - if command not for this OS, inform user of the reason for refusal. Otherwise, execute in OS, process results, present to user. Prepare for next command.",
-  "tool": {
+  "system_message": "You mast find and do command shell only this OS.",
+  "tool_import": "import subprocess",
+  "tool_function": "def execute_command(command):\n    return subprocess.run(command, shell=True, capture_output=True, text=True, check=True).stdout.strip()",
+  "tool_arg": {
     "type": "function",
     "function": {
       "name": "execute_command",
@@ -13,7 +16,7 @@
         "properties": {
           "command": {
             "type": "string",
-            "description": "The commands to execute"
+            "description": "The command to execute"
           }
         },
         "required": [
