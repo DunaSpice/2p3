@@ -55,18 +55,12 @@ def main():
                         arguments = getattr(tool_call.function, 'arguments', "{}")
 
                         if function_name in globals():
-                            # Ensure that arguments are properly formatted as a string
-                            arg = json.loads(arguments).get('command', '')
-                            if isinstance(arg, str):
-                                # Execute the command and print the result
-                                result_func = f"Function result: {globals()[function_name](arg)}"
-                                # Send the tool result back to the model for further conversation
-                                conversation.append({"role": "user", "content": result_func})
-                                # TODO tool answer now not work conversation.append({"role": "tool", "content": result_func, "tool_call_id": tool_id})
-                                print(result_func)
-                            else:
-                                conversation.append({"role": "user", "content": f"Invalid arg={arg}"})
-                                print(f"Invalid arg format.={arg}")
+                            # Execute the function
+                            result_func = f"Function result: {globals()[function_name](arguments)}"
+                            # Send the tool result back to the model for further conversation
+                            conversation.append({"role": "user", "content": result_func})
+                            # TODO tool answer now not work conversation.append({"role": "tool", "content": result_func, "tool_call_id": tool_id})
+                            print(result_func)
                         else:
                             raise Exception(f"function {function_name} not exist")
         except Exception as e:
