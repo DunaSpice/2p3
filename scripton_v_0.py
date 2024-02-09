@@ -1,53 +1,41 @@
+import json
 import os
 import platform
-import sqlite3
-import json  # Добавлен для десериализации JSON
 from dotenv import load_dotenv
 from openai import OpenAI
 
-def load_config_from_db():
-    """Загружает конфигурацию из базы данных SQLite."""
-    conn = sqlite3.connect('config.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT key, value FROM config")
-    config = {}
-    for row in cursor.fetchall():
-        key, value = row
-        if key == "tool_arg":  # Особая обработка для 'tool_arg'
-            value = json.loads(value)  # Десериализация из строки JSON в объект Python
-        config[key] = value
-    conn.close()
-    return config
-
-# Загрузка конфигурации из базы данных
-config = load_config_from_db()
-
-# Загрузка .env файла для доступа к переменным окружения
+# Load configuration from JSON file
+config = json.load(open('config.json'))
+exec(config["tool_import"])
+exec(config["tool_function"])
+# Load .env file
 load_dotenv()
-# Загрузка OpenAI API ключа из переменной окружения
+# Load OpenAI API key from environment variable
 api_key = os.getenv("OPENAI_API_KEY")
 
-# Определение основной функции, которая является точкой входа в скрипт
+
+# Define the function 'main' which is the entry point of the script
 def main():
     client = OpenAI(api_key=api_key)
-    # История разговора
-    conversation = [{"role": "system", "content": f"You are assistant only in operating system {platform.system()}, it important. {config['system_message']}"}]
+    # Conversation history
+    conversation = [{"role": "system", "content": f"You are assistant only in operating system {platform.system()}, "
+                                                  f"it important. {config['system_message']}"}]
 
     while True:
-        # Запрос ввода от пользователя
+        # User for input
         user_content = input("Enter your request (or type '" + config["exit_command"] + "' to quit): ")
-        # Выход из цикла по команде пользователя
+        # Break out of the prompt loop to stop the program
         if user_content.lower() == config["exit_command"]:
             break
-        # Добавление сообщения пользователя в историю разговора
+        # Append user message to conversation history
         conversation.append({"role": "user", "content": user_content})
 
         try:
-            # Получение ответа от ChatGPT OpenAI
+            # Get response from OpenAI's ChatGPT
             response = client.chat.completions.create(
                 model=config["openai_model"],
                 messages=conversation,
-                tools=[config["tool_arg"]],  # Используется уже десериализованный объект
+                tools=[config["tool_arg"]],
                 tool_choice="auto",
             )
             if config.get("debug", False):
@@ -58,10 +46,28 @@ def main():
             if res_message.content:
                 print(res_message.content)
                 conversation.append({"role": "assistant", "content": res_message.content})
+
+            # Check if 'tool_calls' attribute exists and is not None
+            if hasattr(res_message, 'tool_calls') and res_message.tool_calls is not None:
+                for tool_call in res_message.tool_calls:
+                    if getattr(tool_call, 'type', None) == 'function':
+                        function_name = getattr(tool_call.function, 'name', None)
+                        arguments = getattr(tool_call.function, 'arguments', "{}")
+
+                        if function_name in globals():
+                            # Execute the function
+                            result_func = f"Function result: {globals()[function_name](arguments)}"
+                            # Send the tool result back to the model for further conversation
+                            conversation.append({"role": "user", "content": result_func})
+                            # TODO tool answer now not work conversation.append({"role": "tool", "content": result_func, "tool_call_id": tool_id})
+                            print(result_func)
+                        else:
+                            raise Exception(f"function {function_name} not exist")
         except Exception as e:
             conversation.append({"role": "user", "name": "Exception", "content": f"{e}"})
             print(f"Exception: {e}")
 
-# Проверка, является ли скрипт основным модулем, и, в таком случае, выполнение main()
+
+# Check if the script is the main module being executed, and if so, call main()
 if __name__ == "__main__":
     main()
