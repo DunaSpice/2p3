@@ -53,18 +53,25 @@ def main():
                     if getattr(tool_call, 'type', None) == 'function':
                         function_name = getattr(tool_call.function, 'name', None)
                         arguments = getattr(tool_call.function, 'arguments', "{}")
+                        tool_id = getattr(tool_call, 'id', "")
 
                         if function_name in globals():
                             # Execute the function
                             result_func = f"Function result: {globals()[function_name](arguments)}"
                             # Send the tool result back to the model for further conversation
-                            conversation.append({"role": "user", "name": "tool", "content": result_func})
+                            # conversation.append({"role": "user", "content": result_func})
+                            conversation.append({"role": "assistant",
+                                                 "tool_calls": [{"id": tool_id,
+                                                                 "type": "function",
+                                                                 "function": {"name": function_name, "arguments": json.dumps(arguments)}}]})
+                            conversation.append({"role": "tool", "content": result_func, "tool_call_id": tool_id})
                             print(result_func)
                         else:
                             raise Exception(f"function {function_name} not exist")
         except Exception as e:
             conversation.append({"role": "user", "name": "Exception", "content": f"{e}"})
             print(f"Exception: {e}")
+            continue
 
 
 # Check if the script is the main module being executed, and if so, call main()
